@@ -343,7 +343,7 @@ int cpm_suffix(const void *a, const void *b) {
 // ref: https://www.geeksforgeeks.org/dsa/suffix-array-set-2-a-nlognlogn-algorithm/
 // Måtte referere til eksterne kilder for denne implementasjonen
 // O(n log n log n)
-int32_t btw_transform(const unsigned char *input_buffer,
+int32_t bwt_transform(const unsigned char *input_buffer,
                       const size_t input_size,
                       unsigned char *output_buffer) {
   if (input_size == 0) return -1;
@@ -393,7 +393,7 @@ int32_t btw_transform(const unsigned char *input_buffer,
   return original_index;
 }
 
-void reverse_btw_transform(const unsigned char *input_buffer,
+void reverse_bwt_transform(const unsigned char *input_buffer,
                            const size_t input_size,
                            int32_t original_index,
                            unsigned char *output_buffer) {
@@ -530,14 +530,14 @@ size_t run_compress_sequence(const unsigned char *input_buffer,
                              const size_t input_size,
                              unsigned char *output_buffer) {
   unsigned char *rle_buffer = malloc(BLOCKSIZE * 2);
-  unsigned char *btw_buffer = malloc(BLOCKSIZE * 2);
+  unsigned char *bwt_buffer = malloc(BLOCKSIZE * 2);
   unsigned char *mtf_buffer = malloc(BLOCKSIZE * 2);
   unsigned char *rle2_buffer = malloc(BLOCKSIZE * 2);
   unsigned char *huffman_buffer = malloc(BLOCKSIZE * 2);
 
   size_t rle_size = run_length_encoding(input_buffer, input_size, rle_buffer);
-  int32_t original_index = btw_transform(rle_buffer, rle_size, btw_buffer);
-  move_to_front_encode(btw_buffer, rle_size, mtf_buffer);
+  int32_t original_index = bwt_transform(rle_buffer, rle_size, bwt_buffer);
+  move_to_front_encode(bwt_buffer, rle_size, mtf_buffer);
   size_t rle2_size = run_length_encoding(mtf_buffer, rle_size, rle2_buffer);
   // Bygg frekvenstabell for Huffman-koding
   uint32_t *freq_table = build_frequency_table(rle2_buffer, rle2_size);
@@ -560,7 +560,7 @@ size_t run_compress_sequence(const unsigned char *input_buffer,
   memcpy(output_buffer + sizeof(block_header_t), huffman_buffer, final_size);
 
   free(rle_buffer);
-  free(btw_buffer);
+  free(bwt_buffer);
   free(mtf_buffer);
   free(rle2_buffer);
   free(huffman_buffer);
@@ -590,7 +590,7 @@ size_t run_decompress_sequence(const unsigned char *input_buffer,
   move_to_front_decode(rle2_decoded, mtf_size, mtf_decoded);
 
 
-  reverse_btw_transform(mtf_decoded, header->block_size,
+  reverse_bwt_transform(mtf_decoded, header->block_size,
                        header->original_index, bwt_decoded);
 
 
