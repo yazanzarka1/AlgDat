@@ -613,6 +613,10 @@ size_t run_bzip2_compression(FILE *input_file,
   size_t total_input_size = 0;
   size_t total_output_size = 0;
   int num_blocks = 0;
+  fseek(input_file, 0, SEEK_END);
+  printf("Estimated blocks count : %zu\n", (size_t) (ftell(input_file) / BLOCKSIZE) + 1);
+
+  fseek(input_file, 0, SEEK_SET);
   while (!feof(input_file)) {
     const size_t bytes_read = fread(buffer, 1, BLOCKSIZE, input_file);
 
