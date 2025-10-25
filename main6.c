@@ -673,44 +673,7 @@ size_t run_bzip2_decompression(FILE *input_file,
 
 
 int main(int argc, char *argv[]) {
-  // char *test_buffer =
-  //     "Thiiiiis iiiiiiis a prepreatttijninindsf text file wiiith some errrorss.\nIt iiis meaaant to teest the codding abillityy of an AI moddel.\nPleaaase corrrect the errrorss and imprrove the quallity.";
-  // char *encoded_buffer = malloc(strlen(test_buffer) * 4);
-  // char *decoded_buffer = malloc(strlen(test_buffer) + 1);
-  // memset(decoded_buffer, 0, strlen(test_buffer) + 1);
-  //
-  // uint32_t *freq_table = build_frequency_table(test_buffer, strlen(test_buffer));
-  // pq_node_t *huffman_tree = build_huffman_tree(freq_table);
-  // code_table_t *code_table = malloc(sizeof(code_table_t));
-  // build_code_table(huffman_tree, code_table, 0, 0);
-  // size_t compressed_size = huffman_encode((unsigned char *) test_buffer,
-  //                                         strlen(test_buffer),
-  //                                         code_table,
-  //                                         (unsigned char *) encoded_buffer);
-  // size_t decompressed_size = huffman_decode((unsigned char *) encoded_buffer,
-  //                compressed_size,
-  //                huffman_tree,
-  //                (unsigned char *) decoded_buffer);
-  //
-  // printf("Original size:     %zu bytes\n", strlen(test_buffer));
-  // printf("Compressed size:   %zu bytes\n", compressed_size);
-  // printf("Decompressed size: %zu bytes\n", decompressed_size);
-  // printf("Compression ratio: %.2f%%\n\n",
-  //        (1.0 - (double) compressed_size / strlen(test_buffer)) * 100);
-  //
-  // int match = memcmp(test_buffer, decoded_buffer, strlen(test_buffer));
-  // if (match == 0) {
-  //   printf("✓ BWT roundtrip successful!\n\n");
-  // } else {
-  //   printf("✗ BWT roundtrip failed!\n");
-  //   printf("Original: %s\n", test_buffer);
-  //   printf("Decoded:  %s\n\n", decoded_buffer);
-  // }
-  //
-  // free(encoded_buffer);
-  // free(decoded_buffer);
-  //
-  // return 0;
+
   if (argc != 4) {
     print_instructions();
   }
