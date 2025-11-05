@@ -117,7 +117,7 @@ void fyll_unike_tilfeldig(int *t, int n) {
   for (int i = 0; i < n; ++i) { t[i] = rand(); }
 }
 
-void beregn_tid_forskjell(struct timespec start, struct timespec end, int *sec, long *nsec) {
+void calculate_time_difference(struct timespec start, struct timespec end, int *sec, long *nsec) {
   *sec = (int) (end.tv_sec - start.tv_sec);
   *nsec = end.tv_nsec - start.tv_nsec;
   if (*nsec < 0) {
@@ -173,7 +173,7 @@ void kjor_hash(int *base, int n, int valg, int *sec, long *nsec) {
     clock_gettime(CLOCK_THREAD_CPUTIME_ID, &en);
   }
 
-  beregn_tid_forskjell(st, en, sec, nsec);
+  calculate_time_difference(st, en, sec, nsec);
 }
 
 void test_metode(int valg) {

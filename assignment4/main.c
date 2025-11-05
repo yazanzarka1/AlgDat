@@ -251,7 +251,7 @@ void free_open_hash_table(HashTableV2 *ht) {
   free(ht);
 }
 
-void beregn_tid_forskjell(struct timespec start, struct timespec end, int *sec, long *nsec) {
+void calculate_time_difference(struct timespec start, struct timespec end, int *sec, long *nsec) {
   *sec = (int)(end.tv_sec - start.tv_sec);
   *nsec = end.tv_nsec - start.tv_nsec;
   if (*nsec < 0) {
@@ -347,7 +347,7 @@ void del2() {
     clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &end);
     int sec;
     long nsec;
-    beregn_tid_forskjell(start, end, &sec, &nsec);
+    calculate_time_difference(start, end, &sec, &nsec);
     format_tid(tid_buf, sizeof(tid_buf), sec, nsec);
 
     printf("%-15.0f%% %-20s %-15llu %-15s %-15.2f\n",
@@ -361,7 +361,7 @@ void del2() {
       insert_double(ht_double, numbers[j]);
     }
     clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &end);
-    beregn_tid_forskjell(start, end, &sec, &nsec);
+    calculate_time_difference(start, end, &sec, &nsec);
     format_tid(tid_buf, sizeof(tid_buf), sec, nsec);
     printf("%-15s %-20s %-15llu %-15s %-15.2f\n",
            "", "Dobbel hashing", ht_double->collisions, tid_buf, (double) ht_double->collisions / ht_double->count);

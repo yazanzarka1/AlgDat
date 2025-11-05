@@ -17,6 +17,7 @@ typedef struct Suffix {
 typedef struct BlockHeader {
   uint32_t original_index;
   uint32_t block_size;
+  uint32_t rle_size;
   uint32_t freq_table[ALPHABET_SIZE];
 } block_header_t;
 
@@ -256,13 +257,13 @@ size_t huffman_encode(const unsigned char *input_buffer,
 size_t huffman_decode(const unsigned char *input_buffer,
                       const size_t input_size,
                       const pq_node_t *huffman_tree,
-                      unsigned char *output_buffer
+                      unsigned char *output_buffer,
+                      size_t output_size
 ) {
   bit_reader_t br;
   init_bit_writer_or_reader(&br, (unsigned char *) input_buffer);
   size_t out_pos = 0;
   const pq_node_t *current = huffman_tree;
-
   for (size_t i = 0; i < input_size * 8; i++) {
     uint8_t bit;
     br_get_bit(&br, &bit);
@@ -275,6 +276,7 @@ size_t huffman_decode(const unsigned char *input_buffer,
     if (current->left == NULL && current->right == NULL) {
       output_buffer[out_pos++] = (unsigned char) current->byte;
       current = huffman_tree;
+      if (out_pos >= output_size) break;
     }
   }
   return out_pos;
@@ -395,7 +397,7 @@ int32_t bwt_transform(const unsigned char *input_buffer,
 
 void reverse_bwt_transform(const unsigned char *input_buffer,
                            const size_t input_size,
-                           int32_t original_index,
+                           const int32_t original_index,
                            unsigned char *output_buffer) {
   int32_t *T = malloc(input_size * sizeof(int32_t));
   unsigned char *F = malloc(input_size * sizeof(unsigned char));
@@ -535,6 +537,7 @@ size_t run_compress_sequence(const unsigned char *input_buffer,
   unsigned char *rle2_buffer = malloc(BLOCKSIZE * 2);
   unsigned char *huffman_buffer = malloc(BLOCKSIZE * 2);
 
+
   size_t rle_size = run_length_encoding(input_buffer, input_size, rle_buffer);
   int32_t original_index = bwt_transform(rle_buffer, rle_size, bwt_buffer);
   move_to_front_encode(bwt_buffer, rle_size, mtf_buffer);
@@ -552,10 +555,11 @@ size_t run_compress_sequence(const unsigned char *input_buffer,
   // huffman
   block_header_t header = {
     .original_index = original_index,
-    .block_size = rle_size,
+    .block_size = final_size,
+    .rle_size = rle2_size
   };
 
-  memcpy(header.freq_table, freq_table , ALPHABET_SIZE * sizeof(uint32_t));
+  memcpy(header.freq_table, freq_table, ALPHABET_SIZE * sizeof(uint32_t));
   memcpy(output_buffer, &header, sizeof(block_header_t));
   memcpy(output_buffer + sizeof(block_header_t), huffman_buffer, final_size);
 
@@ -567,34 +571,31 @@ size_t run_compress_sequence(const unsigned char *input_buffer,
   return final_size + sizeof(block_header_t);
 }
 
-size_t run_decompress_sequence(const unsigned char *input_buffer,
-                               const size_t input_size,
-                               unsigned char *output_buffer) {
-  // Parse header
-  const block_header_t *header = (const block_header_t *)input_buffer;
-  const unsigned char *compressed_data = input_buffer + sizeof(block_header_t);
-  size_t compressed_size = input_size - sizeof(block_header_t);
-
+size_t run_decompress_sequence(
+  const block_header_t *header,
+  const unsigned char *input_buffer,
+  const size_t input_size,
+  unsigned char *output_buffer) {
   pq_node_t *huffman_tree = build_huffman_tree(header->freq_table);
-
-  unsigned char *huffman_decoded = malloc(BLOCKSIZE * 2);
+  unsigned char *huffman_decoded = malloc(BLOCKSIZE);
   unsigned char *rle2_decoded = malloc(BLOCKSIZE * 2);
   unsigned char *mtf_decoded = malloc(BLOCKSIZE * 2);
   unsigned char *bwt_decoded = malloc(BLOCKSIZE * 2);
 
-  size_t huffman_size = huffman_decode(compressed_data, compressed_size,
-                                       huffman_tree, huffman_decoded);
+  size_t huffman_size = huffman_decode(input_buffer,
+                                       input_size,
+                                       huffman_tree,
+                                       huffman_decoded,
+                                       header->rle_size);
 
   size_t mtf_size = run_length_decoding(huffman_decoded, huffman_size, rle2_decoded);
-
   move_to_front_decode(rle2_decoded, mtf_size, mtf_decoded);
+  reverse_bwt_transform(mtf_decoded,
+                        mtf_size,
+                        (int32_t)header->original_index,
+                        bwt_decoded);
 
-
-  reverse_bwt_transform(mtf_decoded, header->block_size,
-                       header->original_index, bwt_decoded);
-
-
-  size_t output_size = run_length_decoding(bwt_decoded, header->block_size, output_buffer);
+  size_t output_size = run_length_decoding(bwt_decoded, mtf_size, output_buffer);
 
 
   free_tree(huffman_tree);
@@ -625,7 +626,9 @@ size_t run_bzip2_compression(FILE *input_file,
     }
     ++num_blocks;
     total_input_size += bytes_read;
-
+    if (buffer == NULL) {
+      break;
+    }
     const size_t compressed = run_compress_sequence(buffer, bytes_read, output_buffer);
     total_output_size += compressed;
     fwrite(output_buffer, 1, compressed, output_file);
@@ -634,10 +637,14 @@ size_t run_bzip2_compression(FILE *input_file,
 
   printf("\n=== Compression Statistics ===\n");
   printf("Blocks processed: %d\n", num_blocks);
-  printf("Input size:       %zu bytes (%.2f KB)\n", total_input_size, total_input_size / 1024.0);
-  printf("Output size:      %zu bytes (%.2f KB)\n", total_output_size, total_output_size / 1024.0);
+  printf("Input size:       %zu bytes (%.2f KB)\n",
+         total_input_size,
+         (double) total_input_size / 1024.0);
+  printf("Output size:      %zu bytes (%.2f KB)\n",
+         total_output_size,
+         (double) total_output_size / 1024.0);
   printf("Compression ratio: %.2f%%\n",
-         (1.0 - (double) total_output_size / total_input_size) * 100);
+         (1.0 - (double) total_output_size / (double) total_input_size) * 100);
 
   free(buffer);
   free(output_buffer);
@@ -646,38 +653,50 @@ size_t run_bzip2_compression(FILE *input_file,
 
 size_t run_bzip2_decompression(FILE *input_file,
                                FILE *output_file) {
+  block_header_t *block_header_buffer = malloc(sizeof(block_header_t));
   unsigned char *buffer = malloc(BLOCKSIZE * 2);
-  unsigned char *output_buffer = malloc(BLOCKSIZE * 2);
+  unsigned char *output_buffer = malloc(BLOCKSIZE * 6);
   size_t total_input_size = 0;
   size_t total_output_size = 0;
   int num_blocks = 0;
   while (!feof(input_file)) {
-    const size_t bytes_read = fread(buffer, 1, BLOCKSIZE * 2, input_file);
+    fread(block_header_buffer, 1, sizeof(block_header_t), input_file);
+    const size_t bytes_read = fread(buffer, 1, block_header_buffer->block_size, input_file);
     if (bytes_read == 0) {
       break;
     }
     ++num_blocks;
     total_input_size += bytes_read;
-
-    const size_t decompressed = run_decompress_sequence(buffer, bytes_read, output_buffer);
+    if (buffer == NULL) {
+      break;
+    }
+    const size_t decompressed = run_decompress_sequence(block_header_buffer,
+                                                        buffer,
+                                                        bytes_read,
+                                                        output_buffer);
     total_output_size += decompressed;
     fwrite(output_buffer, 1, decompressed, output_file);
   }
 
   printf("\n=== Decompression Statistics ===\n");
   printf("Blocks processed: %d\n", num_blocks);
-  printf("Input size:       %zu bytes (%.2f KB)\n", total_input_size, total_input_size / 1024.0);
-  printf("Output size:      %zu bytes (%.2f KB)\n", total_output_size, total_output_size / 1024.0);
-  printf("Expansion ratio:  %.2f%%\n", ((double) total_output_size / total_input_size - 1.0) * 100);
+  printf("Input size:       %zu bytes (%.2f KB)\n",
+         total_input_size,
+         (double) total_input_size / 1024.0);
+  printf("Output size:      %zu bytes (%.2f KB)\n",
+         total_output_size,
+         (double) total_output_size / 1024.0);
+  printf("Expansion ratio:  %.2f%%\n",
+         ((double) total_output_size / (double) total_input_size - 1.0) * 100);
 
   free(buffer);
+  free(block_header_buffer);
   free(output_buffer);
   return total_output_size;
 }
 
 
 int main(int argc, char *argv[]) {
-
   if (argc != 4) {
     print_instructions();
   }
