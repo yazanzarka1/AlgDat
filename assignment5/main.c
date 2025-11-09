@@ -51,7 +51,6 @@ graph_t *createGraph(const int numVertices) {
   for (int i = 0; i < numVertices; i++) {
     graph->vertex[i].edge = NULL;
   }
-
   return graph;
 }
 
