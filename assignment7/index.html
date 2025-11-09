@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Coordinate Plotter</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"
+    />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        box-sizing: border-box;
+        padding: 20px;
+        font-family: Arial, sans-serif;
+        display: grid;
+        grid-template-columns: 300px 1fr;
+        gap: 20px;
+      }
+      #map {
+        height: 100%;
+        width: 100%;
+      }
+      .sidebar {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+      .controls {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      input[type="file"] {
+        padding: 10px;
+        font-size: 14px;
+      }
+      button {
+        padding: 10px 20px;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      .path-list {
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 10px;
+        max-height: 60vh;
+        overflow-y: auto;
+      }
+      .path-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px;
+        margin-bottom: 8px;
+        border: 1px solid #eee;
+        border-radius: 4px;
+        background: white;
+      }
+      .path-color {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        border: 2px solid white;
+        box-shadow: 0 0 3px rgba(0, 0, 0, 0.3);
+        flex-shrink: 0;
+        cursor: pointer;
+        position: relative;
+      }
+      .path-color:hover {
+        box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+        transform: scale(1.1);
+      }
+      .color-picker-wrapper {
+        position: relative;
+        width: 20px;
+        height: 20px;
+      }
+      .color-picker-input {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 20px;
+        height: 20px;
+        opacity: 0;
+        cursor: pointer;
+      }
+      .path-info {
+        flex: 1;
+        font-size: 12px;
+      }
+      .path-name {
+        font-weight: bold;
+        margin-bottom: 2px;
+      }
+      .path-points {
+        color: #666;
+        font-size: 11px;
+      }
+      .path-actions {
+        display: flex;
+        gap: 5px;
+      }
+      .path-actions button {
+        padding: 4px 8px;
+        font-size: 11px;
+      }
+      .remove-btn {
+        background-color: #dc3545;
+        color: white;
+        border: none;
+      }
+      .remove-btn:hover {
+        background-color: #c82333;
+      }
+      .toggle-btn {
+        background-color: #6c757d;
+        color: white;
+        border: none;
+      }
+      .toggle-btn:hover {
+        background-color: #5a6268;
+      }
+      .path-item.hidden {
+        opacity: 0.5;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="sidebar">
+      <div class="controls">
+        <h1>Coordinate Plotter</h1>
+        <p>
+          Upload a text file with coordinates (one per line: latitude,longitude
+          or latitude longitude)
+        </p>
+        <input type="file" multiple id="fileInput" accept="*" />
+        <button id="addPathBtn">Add Path</button>
+        <button id="clearAllBtn">Clear All</button>
+        <p style="margin-top: 10px; color: #666; font-size: 12px">
+          Click on the map to get coordinates
+        </p>
+      </div>
+      <div class="path-list">
+        <h3 style="margin-top: 0">Paths</h3>
+        <div id="pathsList"></div>
+      </div>
+    </div>
+    <div id="map"></div>
+
+    <script>
+      // Initialize map
+      const map = L.map("map").setView([51.505, -0.09], 13);
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "© OpenStreetMap contributors",
+      }).addTo(map);
+
+      let tempClickMarker = null;
+      let pathIdCounter = 0;
+      const paths = [];
+
+      // Generate random color
+      function getRandomColor() {
+        const colors = [
+          "#FF0000",
+          "#00FF00",
+          "#0000FF",
+          "#FFFF00",
+          "#FF00FF",
+          "#00FFFF",
+          "#FF6600",
+          "#9900FF",
+          "#00FF99",
+          "#FF0099",
+          "#99FF00",
+          "#0099FF",
+          "#FF3300",
+          "#33FF00",
+          "#3300FF",
+        ];
+        return colors[Math.floor(Math.random() * colors.length)];
+      }
+
+      // Parse coordinates from text
+      function parseCoordinates(text) {
+        const lines = text.split("\n");
+        const coords = [];
+
+        lines.forEach((line) => {
+          line = line.trim();
+          if (!line) return;
+
+          // Split by comma or space
+          const parts = line.includes(",")
+            ? line.split(",")
+            : line.split(/\s+/);
+
+          if (parts.length >= 2) {
+            const lat = parseFloat(parts[0]);
+            const lng = parseFloat(parts[1]);
+
+            if (!isNaN(lat) && !isNaN(lng)) {
+              coords.push([lat, lng]);
+            }
+          }
+        });
+
+        return coords;
+      }
+
+      // Add path to the map
+      function addPath(filename, coords, color) {
+        const pathId = pathIdCounter++;
+        const markers = [];
+
+        coords.forEach((coord) => {
+          const marker = L.circleMarker(coord, {
+            radius: 4,
+            fillColor: color,
+            color: "white",
+            weight: 1,
+            opacity: 1,
+            fillOpacity: 0.8,
+          }).addTo(map);
+          markers.push(marker);
+        });
+        const polyline = L.polyline(coords, {
+          color: color,
+          weight: 3,
+          opacity: 0.7,
+        }).addTo(map);
+
+        const path = {
+          id: pathId,
+          name: filename,
+          coords: coords,
+          color: color,
+          markers: markers,
+          polyline: polyline,
+          visible: true,
+        };
+
+        paths.push(path);
+        updatePathsList();
+        fitMapToPaths();
+
+        return path;
+      }
+
+      // Remove path from map
+      function removePath(pathId) {
+        const index = paths.findIndex((p) => p.id === pathId);
+        if (index === -1) return;
+
+        const path = paths[index];
+        path.markers.forEach((m) => map.removeLayer(m));
+        map.removeLayer(path.polyline);
+        paths.splice(index, 1);
+
+        updatePathsList();
+        if (paths.length > 0) {
+          fitMapToPaths();
+        }
+      }
+
+      // Toggle path visibility
+      function togglePath(pathId) {
+        const path = paths.find((p) => p.id === pathId);
+        if (!path) return;
+
+        path.visible = !path.visible;
+
+        if (path.visible) {
+          path.markers.forEach((m) => m.addTo(map));
+          path.polyline.addTo(map);
+        } else {
+          path.markers.forEach((m) => map.removeLayer(m));
+          map.removeLayer(path.polyline);
+        }
+
+        updatePathsList();
+      }
+
+      // Update path color
+      function updatePathColor(pathId, newColor) {
+        const path = paths.find((p) => p.id === pathId);
+        if (!path) return;
+
+        path.color = newColor;
+
+        // Update markers
+        path.markers.forEach((marker) => {
+          marker.setStyle({
+            fillColor: newColor,
+          });
+        });
+
+        // Update polyline
+        path.polyline.setStyle({
+          color: newColor,
+        });
+
+        updatePathsList();
+      }
+
+      // Update paths list display
+      function updatePathsList() {
+        const listElement = document.getElementById("pathsList");
+
+        if (paths.length === 0) {
+          listElement.innerHTML =
+            '<p style="color: #999; font-size: 12px;">No paths added yet</p>';
+          return;
+        }
+
+        listElement.innerHTML = paths
+          .map(
+            (path) => `
+          <div class="path-item ${path.visible ? "" : "hidden"}">
+            <div class="color-picker-wrapper">
+              <div class="path-color" style="background-color: ${
+                path.color
+              }" onclick="document.getElementById('colorPicker${
+              path.id
+            }').click()"></div>
+              <input 
+                type="color" 
+                id="colorPicker${path.id}"
+                class="color-picker-input" 
+                value="${path.color}" 
+                onchange="updatePathColor(${path.id}, this.value)"
+              />
+            </div>
+            <div class="path-info">
+              <div class="path-name">${path.name}</div>
+              <div class="path-points">${path.coords.length} points</div>
+            </div>
+            <div class="path-actions">
+              <button class="toggle-btn" onclick="togglePath(${path.id})">
+                ${path.visible ? "Hide" : "Show"}
+              </button>
+              <button class="remove-btn" onclick="removePath(${
+                path.id
+              })">Remove</button>
+            </div>
+          </div>
+        `
+          )
+          .join("");
+      }
+
+      // Fit map to show all visible paths
+      function fitMapToPaths() {
+        const allCoords = [];
+        paths.forEach((path) => {
+          if (path.visible) {
+            allCoords.push(...path.coords);
+          }
+        });
+
+        if (allCoords.length > 0) {
+          const bounds = L.latLngBounds(allCoords);
+          map.fitBounds(bounds, { padding: [50, 50] });
+        }
+      }
+
+      // Handle file input and add path button
+      document
+        .getElementById("addPathBtn")
+        .addEventListener("click", function () {
+          document.getElementById("fileInput").click();
+        });
+
+      document
+        .getElementById("fileInput")
+        .addEventListener("change", function (e) {
+          for (const file of Array.from(e.target.files)) {
+            const reader = new FileReader();
+            reader.onload = function (e) {
+              const text = e.target.result;
+              const coords = parseCoordinates(text);
+
+              if (coords.length > 0) {
+                const color = getRandomColor();
+                addPath(file.name, coords, color);
+              }
+
+              // Reset file input
+              document.getElementById("fileInput").value = "";
+            };
+
+            reader.readAsText(file);
+          }
+        });
+
+      // Clear all paths
+      document
+        .getElementById("clearAllBtn")
+        .addEventListener("click", function () {
+          const pathsCopy = [...paths];
+          pathsCopy.forEach((path) => removePath(path.id));
+        });
+
+      // Click on map to get coordinates
+      map.on("click", function (e) {
+        // Remove previous temp marker if exists
+        if (tempClickMarker) {
+          map.removeLayer(tempClickMarker);
+        }
+
+        const lat = e.latlng.lat.toFixed(6);
+        const lng = e.latlng.lng.toFixed(6);
+
+        const popup = L.popup()
+          .setLatLng(e.latlng)
+          .setContent(`<b>Coordinates:</b><br>Lat: ${lat}<br>Lng: ${lng}`)
+          .openOn(map);
+
+        tempClickMarker = L.circleMarker(e.latlng, {
+          radius: 5,
+          fillColor: "green",
+          color: "white",
+          weight: 2,
+          opacity: 1,
+          fillOpacity: 0.8,
+        }).addTo(map);
+
+        // Remove marker when popup closes
+        popup.on("remove", function () {
+          if (tempClickMarker) {
+            map.removeLayer(tempClickMarker);
+            tempClickMarker = null;
+          }
+        });
+      });
+
+      // Initialize empty list
+      updatePathsList();
+    </script>
+  </body>
+</html>
