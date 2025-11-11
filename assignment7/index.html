@@ -1,445 +1,151 @@
 <!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Coordinate Plotter</title>
-    <link
-      rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"
-    />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<html>
+<head>
+    <title>Route and POI Viewer</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
-      body {
-        margin: 0;
-        min-height: 100vh;
-        box-sizing: border-box;
-        padding: 20px;
-        font-family: Arial, sans-serif;
-        display: grid;
-        grid-template-columns: 300px 1fr;
-        gap: 20px;
-      }
-      #map {
-        height: 100%;
-        width: 100%;
-      }
-      .sidebar {
-        display: flex;
-        flex-direction: column;
-        gap: 20px;
-      }
-      .controls {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-      }
-      input[type="file"] {
-        padding: 10px;
-        font-size: 14px;
-      }
-      button {
-        padding: 10px 20px;
-        font-size: 14px;
-        cursor: pointer;
-      }
-      .path-list {
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        padding: 10px;
-        max-height: 60vh;
-        overflow-y: auto;
-      }
-      .path-item {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 8px;
-        margin-bottom: 8px;
-        border: 1px solid #eee;
-        border-radius: 4px;
-        background: white;
-      }
-      .path-color {
-        width: 20px;
-        height: 20px;
-        border-radius: 50%;
-        border: 2px solid white;
-        box-shadow: 0 0 3px rgba(0, 0, 0, 0.3);
-        flex-shrink: 0;
-        cursor: pointer;
-        position: relative;
-      }
-      .path-color:hover {
-        box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
-        transform: scale(1.1);
-      }
-      .color-picker-wrapper {
-        position: relative;
-        width: 20px;
-        height: 20px;
-      }
-      .color-picker-input {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 20px;
-        height: 20px;
-        opacity: 0;
-        cursor: pointer;
-      }
-      .path-info {
-        flex: 1;
-        font-size: 12px;
-      }
-      .path-name {
-        font-weight: bold;
-        margin-bottom: 2px;
-      }
-      .path-points {
-        color: #666;
-        font-size: 11px;
-      }
-      .path-actions {
-        display: flex;
-        gap: 5px;
-      }
-      .path-actions button {
-        padding: 4px 8px;
-        font-size: 11px;
-      }
-      .remove-btn {
-        background-color: #dc3545;
-        color: white;
-        border: none;
-      }
-      .remove-btn:hover {
-        background-color: #c82333;
-      }
-      .toggle-btn {
-        background-color: #6c757d;
-        color: white;
-        border: none;
-      }
-      .toggle-btn:hover {
-        background-color: #5a6268;
-      }
-      .path-item.hidden {
-        opacity: 0.5;
-      }
+        body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+        #controls { padding: 10px; background: #f0f0f0; border-bottom: 2px solid #ccc; }
+        #map { height: 100vh; width: 100%; }
+        button { margin: 5px; padding: 8px 16px; cursor: pointer; background: #4CAF50; color: white; border: none; border-radius: 4px; }
+        button:hover { background: #45a049; }
+        .file-btn { background: #2196F3; }
+        .file-btn:hover { background: #0b7dda; }
+        #status { margin-left: 10px; font-weight: bold; color: #333; }
+        .info { padding: 10px; background: #fff3cd; margin: 10px; border-left: 4px solid #ffc107; position: relative; }
+        .info strong { color: #856404; }
+        .close-btn { position: absolute; top: 5px; right: 10px; cursor: pointer; font-size: 20px; color: #856404; background: none; border: none; padding: 0; }
+        .close-btn:hover { color: #000; }
+        .hidden { display: none; }
+        .file-input-wrapper { display: inline-block; margin: 5px; }
+        .file-input-wrapper input[type=file] { display: none; }
+        .file-input-wrapper label { padding: 8px 16px; background: #2196F3; color: white; border-radius: 4px; cursor: pointer; display: inline-block; }
+        .file-input-wrapper label:hover { background: #0b7dda; }
     </style>
-  </head>
-  <body>
-    <div class="sidebar">
-      <div class="controls">
-        <h1>Coordinate Plotter</h1>
-        <p>
-          Upload a text file with coordinates (one per line: latitude,longitude
-          or latitude longitude)
-        </p>
-        <input type="file" multiple id="fileInput" accept="*" />
-        <button id="addPathBtn">Add Path</button>
-        <button id="clearAllBtn">Clear All</button>
-        <p style="margin-top: 10px; color: #666; font-size: 12px">
-          Click on the map to get coordinates
-        </p>
-      </div>
-      <div class="path-list">
-        <h3 style="margin-top: 0">Paths</h3>
-        <div id="pathsList"></div>
-      </div>
+</head>
+<body>
+    <div id="controls">
+        <div class="file-input-wrapper">
+            <label for="routeFile">📂 Load Route File</label>
+            <input type="file" id="routeFile" accept=".txt" onchange="loadFileInput(event, 'route')">
+        </div>
+        <div class="file-input-wrapper">
+            <label for="poisFile">📂 Load POIs File</label>
+            <input type="file" id="poisFile" accept=".txt" onchange="loadFileInput(event, 'pois')">
+        </div>
+        <span id="status"></span>
+    </div>
+    <div class="info" id="instructions">
+        <button class="close-btn" onclick="document.getElementById('instructions').classList.add('hidden')">&times;</button>
+        <strong>⚠ Instructions:</strong><br>
+        1. Run the program to generate path.txt or nearest_pois.txt<br>
+        2. Click the buttons above and select the generated file
     </div>
     <div id="map"></div>
 
     <script>
-      // Initialize map
-      const map = L.map("map").setView([51.505, -0.09], 13);
-
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: "© OpenStreetMap contributors",
-      }).addTo(map);
-
-      let tempClickMarker = null;
-      let pathIdCounter = 0;
-      const paths = [];
-
-      // Generate random color
-      function getRandomColor() {
-        const colors = [
-          "#FF0000",
-          "#00FF00",
-          "#0000FF",
-          "#FFFF00",
-          "#FF00FF",
-          "#00FFFF",
-          "#FF6600",
-          "#9900FF",
-          "#00FF99",
-          "#FF0099",
-          "#99FF00",
-          "#0099FF",
-          "#FF3300",
-          "#33FF00",
-          "#3300FF",
-        ];
-        return colors[Math.floor(Math.random() * colors.length)];
-      }
-
-      // Parse coordinates from text
-      function parseCoordinates(text) {
-        const lines = text.split("\n");
-        const coords = [];
-
-        lines.forEach((line) => {
-          line = line.trim();
-          if (!line) return;
-
-          // Split by comma or space
-          const parts = line.includes(",")
-            ? line.split(",")
-            : line.split(/\s+/);
-
-          if (parts.length >= 2) {
-            const lat = parseFloat(parts[0]);
-            const lng = parseFloat(parts[1]);
-
-            if (!isNaN(lat) && !isNaN(lng)) {
-              coords.push([lat, lng]);
-            }
-          }
-        });
-
-        return coords;
-      }
-
-      // Add path to the map
-      function addPath(filename, coords, color) {
-        const pathId = pathIdCounter++;
-        const markers = [];
-
-        coords.forEach((coord) => {
-          const marker = L.circleMarker(coord, {
-            radius: 4,
-            fillColor: color,
-            color: "white",
-            weight: 1,
-            opacity: 1,
-            fillOpacity: 0.8,
-          }).addTo(map);
-          markers.push(marker);
-        });
-        const polyline = L.polyline(coords, {
-          color: color,
-          weight: 3,
-          opacity: 0.7,
+        const map = L.map('map').setView([63.4, 10.4], 6);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap contributors'
         }).addTo(map);
 
-        const path = {
-          id: pathId,
-          name: filename,
-          coords: coords,
-          color: color,
-          markers: markers,
-          polyline: polyline,
-          visible: true,
-        };
+        let routeLayer = null;
+        let poisLayer = null;
 
-        paths.push(path);
-        updatePathsList();
-        fitMapToPaths();
-
-        return path;
-      }
-
-      // Remove path from map
-      function removePath(pathId) {
-        const index = paths.findIndex((p) => p.id === pathId);
-        if (index === -1) return;
-
-        const path = paths[index];
-        path.markers.forEach((m) => map.removeLayer(m));
-        map.removeLayer(path.polyline);
-        paths.splice(index, 1);
-
-        updatePathsList();
-        if (paths.length > 0) {
-          fitMapToPaths();
-        }
-      }
-
-      // Toggle path visibility
-      function togglePath(pathId) {
-        const path = paths.find((p) => p.id === pathId);
-        if (!path) return;
-
-        path.visible = !path.visible;
-
-        if (path.visible) {
-          path.markers.forEach((m) => m.addTo(map));
-          path.polyline.addTo(map);
-        } else {
-          path.markers.forEach((m) => map.removeLayer(m));
-          map.removeLayer(path.polyline);
-        }
-
-        updatePathsList();
-      }
-
-      // Update path color
-      function updatePathColor(pathId, newColor) {
-        const path = paths.find((p) => p.id === pathId);
-        if (!path) return;
-
-        path.color = newColor;
-
-        // Update markers
-        path.markers.forEach((marker) => {
-          marker.setStyle({
-            fillColor: newColor,
-          });
-        });
-
-        // Update polyline
-        path.polyline.setStyle({
-          color: newColor,
-        });
-
-        updatePathsList();
-      }
-
-      // Update paths list display
-      function updatePathsList() {
-        const listElement = document.getElementById("pathsList");
-
-        if (paths.length === 0) {
-          listElement.innerHTML =
-            '<p style="color: #999; font-size: 12px;">No paths added yet</p>';
-          return;
-        }
-
-        listElement.innerHTML = paths
-          .map(
-            (path) => `
-          <div class="path-item ${path.visible ? "" : "hidden"}">
-            <div class="color-picker-wrapper">
-              <div class="path-color" style="background-color: ${
-                path.color
-              }" onclick="document.getElementById('colorPicker${
-              path.id
-            }').click()"></div>
-              <input 
-                type="color" 
-                id="colorPicker${path.id}"
-                class="color-picker-input" 
-                value="${path.color}" 
-                onchange="updatePathColor(${path.id}, this.value)"
-              />
-            </div>
-            <div class="path-info">
-              <div class="path-name">${path.name}</div>
-              <div class="path-points">${path.coords.length} points</div>
-            </div>
-            <div class="path-actions">
-              <button class="toggle-btn" onclick="togglePath(${path.id})">
-                ${path.visible ? "Hide" : "Show"}
-              </button>
-              <button class="remove-btn" onclick="removePath(${
-                path.id
-              })">Remove</button>
-            </div>
-          </div>
-        `
-          )
-          .join("");
-      }
-
-      // Fit map to show all visible paths
-      function fitMapToPaths() {
-        const allCoords = [];
-        paths.forEach((path) => {
-          if (path.visible) {
-            allCoords.push(...path.coords);
-          }
-        });
-
-        if (allCoords.length > 0) {
-          const bounds = L.latLngBounds(allCoords);
-          map.fitBounds(bounds, { padding: [50, 50] });
-        }
-      }
-
-      // Handle file input and add path button
-      document
-        .getElementById("addPathBtn")
-        .addEventListener("click", function () {
-          document.getElementById("fileInput").click();
-        });
-
-      document
-        .getElementById("fileInput")
-        .addEventListener("change", function (e) {
-          for (const file of Array.from(e.target.files)) {
+        function loadFileInput(event, type) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
             const reader = new FileReader();
-            reader.onload = function (e) {
-              const text = e.target.result;
-              const coords = parseCoordinates(text);
-
-              if (coords.length > 0) {
-                const color = getRandomColor();
-                addPath(file.name, coords, color);
-              }
-
-              // Reset file input
-              document.getElementById("fileInput").value = "";
+            reader.onload = function(e) {
+                const text = e.target.result;
+                plotData(text, type);
+                document.getElementById('status').textContent = `✓ Loaded ${file.name}`;
+                document.getElementById('status').style.color = 'green';
             };
-
+            reader.onerror = function(e) {
+                document.getElementById('status').textContent = `✗ Error reading file`;
+                document.getElementById('status').style.color = 'red';
+            };
             reader.readAsText(file);
-          }
-        });
-
-      // Clear all paths
-      document
-        .getElementById("clearAllBtn")
-        .addEventListener("click", function () {
-          const pathsCopy = [...paths];
-          pathsCopy.forEach((path) => removePath(path.id));
-        });
-
-      // Click on map to get coordinates
-      map.on("click", function (e) {
-        // Remove previous temp marker if exists
-        if (tempClickMarker) {
-          map.removeLayer(tempClickMarker);
         }
 
-        const lat = e.latlng.lat.toFixed(6);
-        const lng = e.latlng.lng.toFixed(6);
+        function plotData(text, type) {
+            const lines = text.trim().split('\n');
+            const coords = lines.map(line => {
+                const [lat, lon] = line.split(',').map(parseFloat);
+                return [lat, lon];
+            }).filter(coord => !isNaN(coord[0]) && !isNaN(coord[1]));
 
-        const popup = L.popup()
-          .setLatLng(e.latlng)
-          .setContent(`<b>Coordinates:</b><br>Lat: ${lat}<br>Lng: ${lng}`)
-          .openOn(map);
+            if (coords.length === 0) {
+                document.getElementById('status').textContent = '✗ No valid coordinates found';
+                document.getElementById('status').style.color = 'red';
+                return;
+            }
 
-        tempClickMarker = L.circleMarker(e.latlng, {
-          radius: 5,
-          fillColor: "green",
-          color: "white",
-          weight: 2,
-          opacity: 1,
-          fillOpacity: 0.8,
-        }).addTo(map);
+            if (type === 'route') {
+                if (routeLayer) map.removeLayer(routeLayer);
+                routeLayer = L.polyline(coords, {color: 'blue', weight: 3}).addTo(map);
+                
+                // Add start marker
+                L.marker(coords[0], {
+                    icon: L.divIcon({className: 'start-marker', html: '🚩', iconSize: [30, 30]})
+                }).addTo(map).bindPopup('Start');
+                
+                // Add end marker
+                L.marker(coords[coords.length - 1], {
+                    icon: L.divIcon({className: 'end-marker', html: '🏁', iconSize: [30, 30]})
+                }).addTo(map).bindPopup('End');
+                
+                map.fitBounds(routeLayer.getBounds());
+            } else {
+                if (poisLayer) map.removeLayer(poisLayer);
+                poisLayer = L.layerGroup().addTo(map);
+                
+                // First coordinate is the search origin
+                if (coords.length > 0) {
+                    L.marker(coords[0], {
+                        icon: L.divIcon({className: 'start-marker', html: '📍', iconSize: [30, 30]})
+                    }).addTo(poisLayer).bindPopup('Search Origin');
+                    
+                    // Plot remaining coordinates as POIs
+                    for (let i = 1; i < coords.length; i++) {
+                        L.circleMarker(coords[i], {
+                            radius: 8,
+                            fillColor: '#ff0000',
+                            color: '#000',
+                            weight: 1,
+                            opacity: 1,
+                            fillOpacity: 0.8
+                        }).addTo(poisLayer).bindPopup(`POI ${i}<br>Lat: ${coords[i][0].toFixed(6)}<br>Lon: ${coords[i][1].toFixed(6)}`);
+                    }
+                    
+                    const bounds = L.latLngBounds(coords);
+                    map.fitBounds(bounds);
+                }
+            }
+        }
 
-        // Remove marker when popup closes
-        popup.on("remove", function () {
-          if (tempClickMarker) {
-            map.removeLayer(tempClickMarker);
-            tempClickMarker = null;
-          }
+        // Try to auto-load files if running from a server
+        window.addEventListener('load', function() {
+            if (window.location.protocol !== 'file:') {
+                // Running from server, try to auto-load
+                fetch('path.txt')
+                    .then(response => response.ok ? response.text() : null)
+                    .then(text => {
+                        if (text) {
+                            plotData(text, 'route');
+                            document.getElementById('status').textContent = '✓ Auto-loaded path.txt';
+                            document.getElementById('status').style.color = 'green';
+                        }
+                    })
+                    .catch(() => {});
+            }
         });
-      });
-
-      // Initialize empty list
-      updatePathsList();
     </script>
-  </body>
+</body>
 </html>
