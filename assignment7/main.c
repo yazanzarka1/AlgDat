@@ -796,7 +796,6 @@ void ALT(graph_t *graph,
                                          current_edge->to,
                                          end,
                                          landmarks,
-                                         landmark_indices,
                                          num_landmarks);
       const uint32_t new_drivetime = current_pred->total_drive_time + current_edge->drive_time;
       const uint32_t estimated_drive_time = new_drivetime + heuristic;
