@@ -358,67 +358,122 @@ graph_t *initialize_graph(const char *nodes_filename,
         return NULL;
     }
 
-    int numEdges;
-    int numNodes;
-    int numPOI;
+    int numEdges = 0;
+    int numNodes = 0;
+    int numPOI = 0;
+    char line[1024];
 
-    fscanf(edgesFile, "%d", &numEdges);
-    fscanf(nodesFile, "%d", &numNodes);
-    fscanf(poiFile, "%d", &numPOI);
+    if (fgets(line, sizeof(line), edgesFile)) {
+        fileExtractResult_t result = extract_tokens_from_line(line, 1);
+        if (result.numberOfReadData >= 1) {
+            token_t *tokens = (token_t *)result.data;
+            if (!tokens[0].is_string) {
+                numEdges = (int)tokens[0].value.number;
+            }
+            free_tokens(tokens, result.numberOfReadData);
+        }
+    }
+    
+    if (fgets(line, sizeof(line), nodesFile)) {
+        fileExtractResult_t result = extract_tokens_from_line(line, 1);
+        if (result.numberOfReadData >= 1) {
+            token_t *tokens = (token_t *)result.data;
+            if (!tokens[0].is_string) {
+                numNodes = (int)tokens[0].value.number;
+            }
+            free_tokens(tokens, result.numberOfReadData);
+        }
+    }
+    
+    if (fgets(line, sizeof(line), poiFile)) {
+        fileExtractResult_t result = extract_tokens_from_line(line, 1);
+        if (result.numberOfReadData >= 1) {
+            token_t *tokens = (token_t *)result.data;
+            if (!tokens[0].is_string) {
+                numPOI = (int)tokens[0].value.number;
+            }
+            free_tokens(tokens, result.numberOfReadData);
+        }
+    }
 
     printf("%d %d %d\n", numEdges, numNodes, numPOI);
 
     graph_t *graph = createGraph(numNodes);
 
     printf("Processing POI\n");
-    uint32_t node_id;
-    uint8_t bit_flag = 0;
-    char *poi_name = malloc(256 * sizeof(char));
-
-    while (fscanf(poiFile, " %d %hhd \"%m[^\"]\"", &node_id, &bit_flag, &poi_name) == 3) {
-        uint32_t node = node_id;
-        graph->vertex[node].poi_flags = bit_flag;
-        graph->vertex[node].poi_name = malloc(strlen(poi_name) + 1);
-        strcpy(graph->vertex[node].poi_name, poi_name);
+    while (fgets(line, sizeof(line), poiFile)) {
+        fileExtractResult_t result = extract_tokens_from_line(line, 3);
+        if (result.numberOfReadData >= 2) {
+            token_t *tokens = (token_t *)result.data;
+            if (!tokens[0].is_string && !tokens[1].is_string) {
+                int node_id = (int)tokens[0].value.number;
+                uint8_t bit_flag = (uint8_t)tokens[1].value.number;
+                
+                if (node_id >= 0 && node_id < graph->numVertices) {
+                    graph->vertex[node_id].poi_flags = bit_flag;
+                    
+                    if (result.numberOfReadData >= 3 && tokens[2].is_string) {
+                        graph->vertex[node_id].poi_name = malloc(strlen(tokens[2].value.string) + 1);
+                        if (graph->vertex[node_id].poi_name) {
+                            strcpy(graph->vertex[node_id].poi_name, tokens[2].value.string);
+                        }
+                    }
+                }
+            }
+            free_tokens(tokens, result.numberOfReadData);
+        }
     }
     fclose(poiFile);
 
-
-    // TODO: improve
     printf("Processing nodes\n");
-    float latitude, longitude;
-    while (fscanf(nodesFile, "%d %f %f", &node_id, &latitude, &longitude) == 3) {
-        const int nodeIndex = node_id;
-        const float lat = latitude;
-        const float lon = longitude;
-        graph->vertex[nodeIndex].latitude = lat;
-        graph->vertex[nodeIndex].longitude = lon;
+    while (fgets(line, sizeof(line), nodesFile)) {
+        fileExtractResult_t result = extract_tokens_from_line(line, 3);
+        if (result.numberOfReadData >= 3) {
+            token_t *tokens = (token_t *)result.data;
+            if (!tokens[0].is_string && !tokens[1].is_string && !tokens[2].is_string) {
+                int node_id = (int)tokens[0].value.number;
+                double latitude = tokens[1].value.number;
+                double longitude = tokens[2].value.number;
+                
+                if (node_id >= 0 && node_id < graph->numVertices) {
+                    graph->vertex[node_id].latitude = latitude;
+                    graph->vertex[node_id].longitude = longitude;
+                }
+            }
+            free_tokens(tokens, result.numberOfReadData);
+        }
     }
+    fclose(nodesFile);
 
-
-    // TODO: Improve
     printf("Processing edges\n");
-    uint32_t to_node_id;
-    uint32_t drive_time;
-    uint32_t length;
-    uint32_t speed;
-    while (fscanf(edgesFile, "%d %d %d %d %d", &node_id, &to_node_id, &drive_time, &length, &speed) == 5) {
-        addEdge(graph,
-                node_id,
-                to_node_id,
-                drive_time,
-                length,
-                speed);
+    while (fgets(line, sizeof(line), edgesFile)) {
+        fileExtractResult_t result = extract_tokens_from_line(line, 5);
+        if (result.numberOfReadData >= 5) {
+            token_t *tokens = (token_t *)result.data;
+            if (!tokens[0].is_string && !tokens[1].is_string && 
+                !tokens[2].is_string && !tokens[3].is_string && !tokens[4].is_string) {
+                int from_node = (int)tokens[0].value.number;
+                int to_node = (int)tokens[1].value.number;
+                uint32_t drive_time = (uint32_t)tokens[2].value.number;
+                uint32_t length = (uint32_t)tokens[3].value.number;
+                uint8_t speed = (uint8_t)tokens[4].value.number;
+                
+                if (from_node >= 0 && from_node < graph->numVertices &&
+                    to_node >= 0 && to_node < graph->numVertices) {
+                    addEdge(graph, from_node, to_node, drive_time, length, speed);
+                }
+            }
+            free_tokens(tokens, result.numberOfReadData);
+        }
     }
+    fclose(edgesFile);
 
-    // validere antall kanter
     if (graph->numEdges != numEdges) {
         printf("Warning: Expected %d edges, but found %d edges in the file.\n",
                numEdges,
                graph->numEdges);
     }
-    fclose(edgesFile);
-    fclose(nodesFile);
+    
     return graph;
 }
 
