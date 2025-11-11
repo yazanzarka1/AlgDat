@@ -375,13 +375,11 @@ graph_t *initialize_graph(const char *nodes_filename,
     uint8_t bit_flag = 0;
     char *poi_name = malloc(256 * sizeof(char));
 
-    while (fscanf(poiFile, "%d %hhd %s", &node_id, &bit_flag, poi_name) == 3) {
+    while (fscanf(poiFile, " %d %hhd \"%m[^\"]\"", &node_id, &bit_flag, &poi_name) == 3) {
         uint32_t node = node_id;
-        if (node < graph->numVertices) {
-            graph->vertex[node].poi_flags = bit_flag;
-            graph->vertex[node].poi_name = malloc(strlen(poi_name) + 1);
-            strcpy(graph->vertex[node].poi_name, poi_name);
-        }
+        graph->vertex[node].poi_flags = bit_flag;
+        graph->vertex[node].poi_name = malloc(strlen(poi_name) + 1);
+        strcpy(graph->vertex[node].poi_name, poi_name);
     }
     fclose(poiFile);
 
@@ -512,19 +510,17 @@ nearest_poi_t *dijkstra_nearest_pois(const graph_t *graph, const vertex_t *start
         vertex_t *current_vertex = current->data;
         free(current);
         int vertex_index = (int) (current_vertex - graph->vertex);
-
         if (visited[vertex_index]) {
             continue;
         }
         visited[vertex_index] = true;
         count++;
 
-        if ((current_vertex->poi_flags & poi_type_flags) != 0) {
+        if (is_flag_set(current_vertex->poi_flags, poi_type_flags)) {
             predecessor_t *pred = current_vertex->data;
             nearest[found_count].vertex = current_vertex;
             nearest[found_count].drive_time = pred->total_drive_time;
             found_count++;
-
             if (found_count >= n) {
                 break;
             }
@@ -846,8 +842,8 @@ void print_path(const graph_t *graph, const vertex_t *start, const vertex_t *end
     }
 
     printf("Path from node %lld to node %lld (Drive time: %u):\n",
-           (long long)(start - graph->vertex),
-           (long long)(end - graph->vertex),
+           (long long) (start - graph->vertex),
+           (long long) (end - graph->vertex),
            end_pred->total_drive_time);
 
     int32_t number_of_vertices = 0;
@@ -862,15 +858,15 @@ void print_path(const graph_t *graph, const vertex_t *start, const vertex_t *end
         return;
     }
 
-    char **coordinates = (char **)malloc((size_t)number_of_vertices * sizeof *coordinates);
+    char **coordinates = (char **) malloc((size_t) number_of_vertices * sizeof *coordinates);
     if (!coordinates) {
         fprintf(stderr, "OOM: coordinates array\n");
         return;
     }
 
-    vertex_t *current_vertex = (vertex_t *)end;
+    vertex_t *current_vertex = (vertex_t *) end;
     for (int i = number_of_vertices - 1; i >= 0; --i) {
-        coordinates[i] = (char *)malloc(256);
+        coordinates[i] = (char *) malloc(256);
         if (!coordinates[i]) {
             fprintf(stderr, "OOM: coordinates[%d]\n", i);
             free_coordinates(coordinates, number_of_vertices);
@@ -934,7 +930,15 @@ int main(int argc, char *argv[]) {
     }
 
     printf("Loading graph data...\n");
-    int landmarks_indices[] = {7826348, 5519970, 5518023, 2246647, 7069033};
+    int landmarks_indices[] = {
+        7826348, //Trondheim
+        5519970, // Agder
+        5518023, // Moxy Bergen
+        2246647, // Kirkenes
+        5459754, // Horsnes
+        925129, // Helsinki,
+        545911 // København
+    };
     graph_t *graph = initialize_graph("noder.txt", "kanter.txt", "interessepkt.txt");
     preprocessed_landmarks_t **landmarks = preprocess_graph(graph, landmarks_indices, 5);
     printf("\n==========================================\n\n");
